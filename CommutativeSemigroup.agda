@@ -18,6 +18,13 @@ import Relation.Binary.EqReasoning as EqReasoning
 
 open import Containers.Semigroup
 
+foldr-fold : ∀ {n} {a} {A : Set a} (f : A → A → A) z (xs : Vec A n) → foldr _ f z xs ≡ fold rightA f (xs ∷ʳ z)
+foldr-fold f z [] = refl
+foldr-fold f z (x ∷ xs) = cong (f x) (foldr-fold f z xs)
+
+foldl-fold : ∀ {n} {a} {A : Set a} (f : A → A → A) z (xs : Vec A n) → foldl _ f z xs ≡ fold leftA f (z ∷ xs)
+foldl-fold f z xs rewrite sym (foldl₁-fold f (z ∷ xs)) = refl
+
 infixr 5 _∷_
 
 data Permutation : ℕ → Set where
@@ -53,6 +60,14 @@ insert-max : ∀ {n} {a} {A : Set a} (ys : Vec A n) x → insert ys max x ≡ ys
 insert-max [] x = refl
 insert-max (y ∷ ys) x = cong (_∷_ y) (insert-max ys x)
 
+reverse-∷ʳ : ∀ {n} {a} {A : Set a} (ys : Vec A n) x → reverse ys ∷ʳ x ≡ reverse (x ∷ ys)
+reverse-∷ʳ {A = A} xs x = 
+  foldl-elim
+    (λ xs b → b ∷ʳ x ≡ reverse (x ∷ xs)) 
+    refl 
+    (λ {_} {_} {_} {xs} eq → trans (cong (_∷_ _) eq) (foldl-lemma {B = λ n -> Vec A (suc n)} xs))
+    xs
+
 reverseP-reverse : ∀ {n} {a} {A : Set a} (xs : Vec A n) → permute reverseP xs ≡ reverse xs
 reverseP-reverse [] = refl
 reverseP-reverse {suc n} {_} {A} (x ∷ xs) = 
@@ -65,13 +80,7 @@ reverseP-reverse {suc n} {_} {A} (x ∷ xs) =
     ≈⟨ reverse-∷ʳ xs x ⟩
       reverse (x ∷ xs)
     ∎
-  where
-  
-  open EqReasoning (≡-setoid (Vec A (1 + n)))
-
-  reverse-∷ʳ : ∀ {n} {a} {A : Set a} (ys : Vec A n) x → reverse ys ∷ʳ x ≡ reverse (x ∷ ys)
-  reverse-∷ʳ [] x = refl
-  reverse-∷ʳ (y ∷ ys) x = {!!}
+  where open EqReasoning (≡-setoid (Vec A (1 + n)))
 
 
 module Commutative-Proof {a b} (S : Semigroup a b) where
@@ -81,26 +90,6 @@ module Commutative-Proof {a b} (S : Semigroup a b) where
     open Associative-Proof S
 
     open CommutativeSemiring commutativeSemiring using (+-comm)
-
-    +-one : ∀ n m → n + m ≡ 1 → n ≡ 0 ⊎ m ≡ 0
-    +-one zero m pf = inj₁ refl
-    +-one (suc n) zero pf = inj₂ refl
-    +-one (suc n) (suc m) pf rewrite +-comm n (suc m) with pf
-    ...                                               | ()
-
-    ¬Association0 : Association 0 → ⊥
-    ¬Association0 x with lemma x
-    ...             | n , ()
-
-    Association-leaf : (a : Association 1) → a ≡ leaf
-    Association-leaf a = ≅-to-≡ (helper a refl)
-      where
-      open import Relation.Binary.HeterogeneousEquality
-      helper : ∀ {n} → (a : Association n) → n ≡ 1 → a ≅ leaf
-      helper leaf n≡1 = refl
-      helper (node {m} {n} l r) n≡1 with +-one m n n≡1
-      ...                           | inj₁ p rewrite p = ⊥-elim (¬Association0 l)
-      ...                           | inj₂ q rewrite q = ⊥-elim (¬Association0 r)
 
     foldr₁-∷ʳ : ∀ {n} x (ys : Vec Carrier (1 + n)) → foldr₁ _∙_ ys ∙ x ≈ foldr₁ _∙_ (ys ∷ʳ x)
     foldr₁-∷ʳ x (y ∷ []) = ≈-refl
